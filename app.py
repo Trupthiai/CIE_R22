@@ -58,11 +58,14 @@ if uploaded_file:
             # Apply the function to distribute marks based on Total Marks
             generated_scores = df["Total Marks"].apply(distribute_marks)
 
-            # Merge the generated scores with the original data (drop original 'Total Marks')
+            # Remove original 'Total Marks' to avoid duplication
             df_clean = df.drop(columns=["Total Marks"])
             final_df = pd.concat([df_clean, generated_scores], axis=1)
 
-            # Display the final DataFrame with generated marks
+            # Add a Sum column (sum of Q1–Q17, Part A, and Part B)
+            final_df["Sum"] = final_df.iloc[:, :17].sum(axis=1)
+
+            # Display the final DataFrame with generated marks and Sum column
             st.success("✅ Scores generated successfully!")
             st.dataframe(final_df)
 
@@ -74,7 +77,7 @@ if uploaded_file:
             st.download_button(
                 label="📥 Download Q1–Q17 Excel File",
                 data=output.getvalue(),
-                file_name="Generated_Marks.xlsx",
+                file_name="Generated_Marks_with_Sum.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
