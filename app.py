@@ -50,4 +50,35 @@ if uploaded_file:
                     **part_a_dict,
                     **part_b_dict,
                     "Part A": part_a_score,
-                    "Pa
+                    "Part B": part_b_score,
+                    "Total Marks": total
+                }
+                return pd.Series(all_data)
+
+            # Apply the function to distribute marks based on Total Marks
+            generated_scores = df["Total Marks"].apply(distribute_marks)
+
+            # Merge the generated scores with the original data (drop original 'Total Marks')
+            df_clean = df.drop(columns=["Total Marks"])
+            final_df = pd.concat([df_clean, generated_scores], axis=1)
+
+            # Display the final DataFrame with generated marks
+            st.success("✅ Scores generated successfully!")
+            st.dataframe(final_df)
+
+            # Prepare the output Excel file for download
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                final_df.to_excel(writer, index=False, sheet_name="Generated Scores")
+
+            st.download_button(
+                label="📥 Download Q1–Q17 Excel File",
+                data=output.getvalue(),
+                file_name="Generated_Marks.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    except Exception as e:
+        st.error(f"❌ Error processing file: {e}")
+else:
+    st.info("📤 Upload a `.xlsx` file with a column 'Total Marks' only.")
