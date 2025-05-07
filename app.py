@@ -5,32 +5,32 @@ import io
 # Streamlit app title
 st.title("Student Marks Uploader & Downloader")
 
-# File uploader
-uploaded_file = st.file_uploader("Upload Excel File (.xlsx or .xls)", type=["xlsx", "xls"])
+# Upload Excel file
+uploaded_file = st.file_uploader("Upload Excel File (.xlsx)", type=["xlsx"])
 
 if uploaded_file is not None:
     try:
-        # Read the uploaded file
-        df = pd.read_excel(uploaded_file)
-        
-        # Check if the "Total Marks" column exists
+        # Read Excel file
+        df = pd.read_excel(uploaded_file, engine="openpyxl")
+
+        # Check for required column
         if "Total Marks" not in df.columns:
             st.error("❌ The uploaded file must contain a column named 'Total Marks'.")
         else:
             st.success("✅ File successfully loaded!")
             st.dataframe(df)
 
-            # Allow the user to download the modified file as .xls
+            # Prepare Excel file for download (.xlsx)
             output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlwt') as writer:
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df.to_excel(writer, index=False, sheet_name='Marks')
 
             # Download button
             st.download_button(
-                label="📥 Download as .xls",
+                label="📥 Download as .xlsx",
                 data=output.getvalue(),
-                file_name="Processed_Marks.xls",
-                mime="application/vnd.ms-excel"
+                file_name="Processed_Marks.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
     except Exception as e:
