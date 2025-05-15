@@ -2,55 +2,57 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-# Define question levels and corresponding questions
-levels = ['L1', 'L1', 'L2', 'L1', 'L1', 'L2', 'L1', 'L1', 'L1', 'L1',
-          'L2', 'L1', 'L2', 'L3', 'L2', 'L4', 'L3']
+# Configuration: Questions and distribution weights (sum = 30)
 questions = [f'Q{i}' for i in range(1, 18)]
+question_weights = [1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 3, 2, 4, 3]
 
-st.title("📊 Question Level Summary Generator")
+st.title("📊 Distribute Total Marks into Q1–Q17")
 
-uploaded_file = st.file_uploader("Upload Excel file with Marks (Q1 to Q17)", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload Excel with 'Total Marks' column", type=["xlsx"])
 
 if uploaded_file:
     try:
-        # Load and clean the Excel file
         df = pd.read_excel(uploaded_file)
-        df.columns = df.columns.str.strip()  # Strip any leading/trailing spaces
+        df.columns = df.columns.str.strip()
 
-        # Drop unnamed columns if present
-        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-
-        # Check if all required questions are in the DataFrame
-        missing_cols = [q for q in questions if q not in df.columns]
-        if missing_cols:
-            st.error(f"Missing required columns: {missing_cols}")
+        if 'Total Marks' not in df.columns:
+            st.error("Excel must have a 'Total Marks' column.")
         else:
-            # Compute totals
-            question_totals = df[questions].sum()
+            total_weight = sum(question_weights)
+            weight_proportions = [w / total_weight for w in question_weights]
+
+            # Distribute marks per student
+            distributed_data = []
+            for total in df['Total Marks']:
+                student_marks = [round(total * p) for p in weight_proportions]
+                distributed_data.append(student_marks)
+
+            dist_df = pd.DataFrame(distributed_data, columns=questions)
+
+            # Sum marks question-wise
+            question_totals = dist_df.sum()
             grand_total = question_totals.sum()
 
-            # Prepare output DataFrame
-            output_df = pd.DataFrame([levels, questions, question_totals.tolist()],
-                                     index=['Level', 'Question', 'Total'])
+            # Prepare final DataFrame with just one row of totals + grand total
+            result_df = pd.DataFrame([question_totals.tolist()], columns=questions, index=["Total"])
+            result_df[30] = grand_total  # Add grand total
 
-            output_df[30] = ['', '', grand_total]
+            # Show in app
+            st.subheader("🧾 Question-wise Totals")
+            st.dataframe(result_df)
 
-            # Show summary
-            st.subheader("📋 Question-wise Totals Summary")
-            st.dataframe(output_df)
-
-            # Excel download
+            # Create downloadable Excel
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                output_df.to_excel(writer, index=True, header=False)
+                result_df.to_excel(writer, index=False)
             buffer.seek(0)
 
             st.download_button(
-                label="📥 Download Summary as Excel",
+                label="📥 Download Excel",
                 data=buffer,
-                file_name="Question_Level_Summary.xlsx",
+                file_name="Question_Totals_Simplified.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
     except Exception as e:
-        st.error(f"Error processing file: {e}")
+        st.error(f"Error: {e}")
