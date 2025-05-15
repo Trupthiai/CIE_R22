@@ -3,82 +3,89 @@ import pandas as pd
 import random
 from io import BytesIO
 
+st.set_page_config(page_title="Marks Splitter", layout="centered")
 st.title("📄 Total Marks Splitter (Part A + Part B)")
 
 st.markdown("""
-**📥 Input Format:** Excel file with a column named **`Total Marks`**  
-- ✅ **Part A (Q1–Q12)**: Max 12 marks → each question = `1` or blank (`''`) only  
-- ✅ **Part B (Q13–Q17)**: Max 18 marks → 3 questions attempted from 5, each up to 6 marks  
+**📥 Upload Excel File:**  
+- Column name must be `Total Marks`  
+- Each value should be between **0 and 30**  
+- This app splits the marks into:
+  - ✅ **Part A (Q1–Q12)**: Max 12 marks → only `1` or blank
+  - ✅ **Part B (Q13–Q17)**: Max 18 marks → 3 out of 5 questions, each up to 6 marks  
 """)
 
-uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
 questions = [f"Q{i}" for i in range(1, 18)]
-partA = questions[:12]  # Q1–Q12
-partB = questions[12:]  # Q13–Q17
+partA = questions[:12]  # Q1 to Q12
+partB = questions[12:]  # Q13 to Q17
 
 def distribute_marks(total):
-    # Split total into Part A and Part B (12 + 18)
-    partA_max = min(12, total)
-    partB_max = total - partA_max
-    if partB_max > 18:
-        partB_max = 18
-        partA_max = total - 18
+    # Clamp total to valid range
+    total = max(0, min(30, int(total)))
 
-    # --- Part A: distribute only 1 or blank ---
+    # Allocate Part A and Part B marks
+    partA_max = min(12, total)
+    partB_max = min(18, total - partA_max)
+
+    # Adjust in case total > 30
+    if total - partA_max > 18:
+        partB_max = 18
+        partA_max = total - partB_max
+
+    # --- Part A: assign 1 or blank only ---
     a_marks = [''] * 12
-    ones_to_assign = partA_max
+    ones_to_assign = max(0, min(partA_max, 12))
     if ones_to_assign > 0:
         indices = random.sample(range(12), ones_to_assign)
         for idx in indices:
             a_marks[idx] = 1
 
-    # --- Part B: select 3 questions randomly, each gets 1–6 marks ---
+    # --- Part B: assign to 3 questions randomly ---
     b_marks = [''] * 5
     selected = random.sample(range(5), 3)
     remaining = partB_max
     for i in selected:
         if remaining <= 0:
-            b_marks[i] = ''
-        else:
-            mark = random.randint(1, min(6, remaining))
-            b_marks[i] = mark
-            remaining -= mark
+            break
+        mark = random.randint(1, min(6, remaining))
+        b_marks[i] = mark
+        remaining -= mark
 
     return a_marks + b_marks
 
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file)
-        df.columns = df.columns.str.strip()
+        df.columns = df.columns.str.strip()  # Remove whitespace in column names
 
         if "Total Marks" not in df.columns:
-            st.error("❌ 'Total Marks' column not found in uploaded file.")
+            st.error("❌ Column 'Total Marks' not found in uploaded file.")
         else:
-            data = []
-            for total in df["Total Marks"]:
-                total = int(total)
-                row = distribute_marks(total)
-                data.append(row)
+            processed = []
+            for val in df["Total Marks"]:
+                row = distribute_marks(val)
+                processed.append(row)
 
-            result_df = pd.DataFrame(data, columns=questions)
-            result_df["Total Marks"] = df["Total Marks"]
+            output_df = pd.DataFrame(processed, columns=questions)
+            output_df["Total Marks"] = df["Total Marks"]
 
             st.success("✅ Marks distributed successfully!")
-            st.dataframe(result_df)
+            st.dataframe(output_df)
 
-            # Download Excel
+            # Prepare downloadable Excel
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-                result_df.to_excel(writer, index=False)
+                output_df.to_excel(writer, index=False)
             buffer.seek(0)
 
             st.download_button(
-                label="📥 Download Output Excel",
+                label="📥 Download Split Marks Excel",
                 data=buffer,
                 file_name="Split_Marks_Output.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
     except Exception as e:
-        st.error(f"❌ Error: {e}")
+        st.error(f"❌ Error processing file: {e}")
